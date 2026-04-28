@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 st.set_page_config(page_title="桥梁系统测试", page_icon="⚙️")
 
-st.title("婆婆的在线实验室")
+st.title("婆婆的在线实验室(v2)")
 st.write("婆婆您好，Jayden的系统正在测试中。如果您看到了这条消息，请点击确认。")
 
 if st.button("确认 (Confirm)"):
