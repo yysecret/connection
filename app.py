@@ -1,15 +1,39 @@
+import os
 import streamlit as st
 import datetime
 import logging
 from zoneinfo import ZoneInfo
+from dotenv import load_dotenv
 from openai import OpenAI
+from streamlit.errors import StreamlitSecretNotFoundError
+
+load_dotenv()
 
 # 1. 基础设置与日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 st.set_page_config(page_title="婆婆的在线实验室", page_icon="⚙️")
 
-# 2. 初始化 OpenAI 客户端 (自动从 Streamlit Secrets 中读取密钥)
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+def _openai_api_key():
+    key = os.environ.get("OPENAI_API_KEY")
+    if key:
+        return key
+    try:
+        return st.secrets["OPENAI_API_KEY"]
+    except (StreamlitSecretNotFoundError, KeyError, FileNotFoundError):
+        return None
+
+
+# 2. 初始化 OpenAI 客户端：本地用 .env / 环境变量，云端用 Streamlit Secrets
+_api_key = _openai_api_key()
+if not _api_key:
+    st.error(
+        "未找到 OPENAI_API_KEY。请在项目根目录 `.env` 中设置，"
+        "或创建 `.streamlit/secrets.toml`，或在 Streamlit Cloud 的 Secrets 中配置。"
+    )
+    st.stop()
+
+client = OpenAI(api_key=_api_key)
 
 # 3. 界面 UI 设计 (保持学术感，去除花哨的元素)
 st.title("⚙️ 婆婆的专属数字实验室")
