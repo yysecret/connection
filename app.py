@@ -1,7 +1,7 @@
 import streamlit as st
 import datetime
 import logging
-import pytz
+from zoneinfo import ZoneInfo
 from openai import OpenAI
 
 # 1. 基础设置与日志
@@ -36,7 +36,9 @@ user_input = st.text_input("请输入检索关键词或指令：")
 if st.button("开始检索 (Execute)"):
     if user_input:
         # 记录日志 (纽约时间)
-        ny_time = datetime.datetime.now(pytz.timezone('America/New_York')).strftime("%Y-%m-%d %H:%M:%S")
+        ny_time = datetime.datetime.now(ZoneInfo("America/New_York")).strftime(
+            "%Y-%m-%d %H:%M:%S %Z"
+        )
         logging.info(f"[{ny_time} NY Time] 阚教授发起检索: {user_input}")
         
         with st.spinner('系统正在从内部学术数据库中检索，请稍候...'):
