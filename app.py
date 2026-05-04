@@ -1,13 +1,36 @@
 import os
-import streamlit as st
 import datetime
 import logging
+from pathlib import Path
+
+import streamlit as st
 from zoneinfo import ZoneInfo
-from dotenv import load_dotenv
 from openai import OpenAI
 from streamlit.errors import StreamlitSecretNotFoundError
 
-load_dotenv()
+
+def _load_env_file() -> None:
+    """Load KEY=VALUE pairs from project .env into os.environ (no extra dependency)."""
+    path = Path(__file__).resolve().parent / ".env"
+    if not path.is_file():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].strip()
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+        value = value.strip().strip("'").strip('"')
+        os.environ[key] = value
+
+
+_load_env_file()
 
 # 1. 基础设置与日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
