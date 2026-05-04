@@ -1,5 +1,4 @@
 
 tzdata
 streamlit
-pytz
 openai
