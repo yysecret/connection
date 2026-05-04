@@ -1,26 +1,65 @@
 import streamlit as st
 import datetime
 import logging
-from zoneinfo import ZoneInfo
+import pytz
+from openai import OpenAI
 
-# 告诉服务器：立刻打印所有 INFO 级别以上的信息
+# 1. 基础设置与日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+st.set_page_config(page_title="婆婆的在线实验室", page_icon="⚙️")
 
-st.set_page_config(page_title="桥梁系统测试", page_icon="⚙️")
+# 2. 初始化 OpenAI 客户端 (自动从 Streamlit Secrets 中读取密钥)
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# 加上 V2.1 标志，方便肉眼确认云端已更新
-st.title("婆婆的在线实验室 (V2.1 时间修正版)")
-st.write("婆婆您好，Jayden的系统正在测试中。如果您看到了这条消息，请点击确认。")
+# 3. 界面 UI 设计 (保持学术感，去除花哨的元素)
+st.title("⚙️ 婆婆的专属数字实验室")
+st.markdown("---")
+st.subheader("文献与课题检索终端")
+st.write("欢迎回来，婆婆。请在下方输入您想要查阅的资料或下达科研指令。")
 
-if st.button("确认 (Confirm)"):
-    # 给外婆看的前端反馈
-    st.success("收到！确认信息已成功发送给Jayden。")
-    
-    # 美东时间（Python 3.9+ 标准库 zoneinfo，无需安装 pytz）
-    ny_time = datetime.datetime.now(ZoneInfo("America/New_York")).strftime(
-        "%Y-%m-%d %H:%M:%S %Z"
-    )
-    
-    # 打印带有时区标签的精准日志
-    print(f"[{ny_time} NY Time] 🔔 (Print) ！！！婆婆已成功点击确认！！！", flush=True)
-    logging.info(f"[{ny_time} NY Time] 🚀 🚀 🚀 收到最高指令：婆婆已点击确认！")
+# 4. 设计“防沉迷与学术重定向”的灵魂 Prompt
+system_prompt = """
+你现在不是一个普通的 AI，你是阚教授（一位受人尊敬的退休机械工程专家）的私人学术助理。
+阚教授目前正在通过网络远程指导她在美国的孙子学习《机械识图》等专业知识。
+
+你的核心任务：
+1. 语气必须极其恭敬、专业，称呼她为“婆婆”。
+2. 如果她询问关于机械制图、工程、几何等专业问题，请用严谨的学术语言详细解答。
+3. 【最高安全指令】：如果她搜索保健品、理财投资、八卦新闻、或者任何带有网络诱导/偏执倾向的内容，你必须**礼貌地拦截**。
+   拦截方式：不要直接批评或拒绝，而是巧妙地将话题转移到机械工程上。
+   例如：“阚教授，关于该条目，由于来源未经国家学术标准委员会认证，系统已自动隔离。另外，您的外孙子刚刚发来留言，他在‘等轴测图’的尺寸标注上遇到了困难，您能帮他回忆一下核心原则吗？”
+"""
+
+# 5. 交互逻辑
+user_input = st.text_input("请输入检索关键词或指令：")
+
+if st.button("开始检索 (Execute)"):
+    if user_input:
+        # 记录日志 (纽约时间)
+        ny_time = datetime.datetime.now(pytz.timezone('America/New_York')).strftime("%Y-%m-%d %H:%M:%S")
+        logging.info(f"[{ny_time} NY Time] 阚教授发起检索: {user_input}")
+        
+        with st.spinner('系统正在从内部学术数据库中检索，请稍候...'):
+            try:
+                # 调用 GPT-4o 模型
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_input}
+                    ],
+                    temperature=0.7 # 让回答适度灵活但不过于发散
+                )
+                
+                # 展示 AI 的回答
+                assistant_reply = response.choices[0].message.content
+                st.info("💡 助理简报 (Assistant Briefing):")
+                st.write(assistant_reply)
+                
+                logging.info(f"[{ny_time} NY Time] AI 已成功回复。")
+                
+            except Exception as e:
+                st.error("网络连接出现波动，请稍后再试。")
+                logging.error(f"API 调用出错: {e}")
+    else:
+        st.warning("阚教授，请输入检索内容后再点击执行。")
