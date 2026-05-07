@@ -107,10 +107,11 @@ excalidraw_url = f"https://excalidraw.com/#room={room_id}"
 st.write("📖 **操作指南**：")
 st.caption("1. 您在这里画的内容，外婆在那边刷新页面后也能实时看到并修改。")
 st.caption("2. 点击左上角的『菜单』图标，可以保存图片到本地电脑。")
+st.caption("3. 为保证在 Streamlit Cloud 稳定可用，请点击下方按钮在新标签页打开白板。")
 
-# 嵌入白板界面
-# height=800 给予足够的绘图空间
-components.iframe(excalidraw_url, height=800, scrolling=True)
+# 在新标签页打开白板（比 iframe 在 Cloud 上更稳定）
+st.link_button("🚀 打开实时协同白板", excalidraw_url, use_container_width=True)
+st.markdown(f"备用链接：[{excalidraw_url}]({excalidraw_url})")
 
 st.markdown("---")
 
