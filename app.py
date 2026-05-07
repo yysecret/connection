@@ -1,11 +1,14 @@
 import os
 import datetime
 import logging
+import socket
+import ssl
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 from zoneinfo import ZoneInfo
-from openai import OpenAI
+from openai import APITimeoutError, APIConnectionError, OpenAI
 from streamlit.errors import StreamlitSecretNotFoundError
 
 
@@ -27,6 +30,8 @@ def _load_env_file() -> None:
         if not key or key in os.environ:
             continue
         value = value.strip().strip("'").strip('"')
+        # Normalize accidental control characters copied with secrets.
+        value = value.replace("\r", "").replace("\n", "")
         os.environ[key] = value
 
 
@@ -40,11 +45,50 @@ st.set_page_config(page_title="婆婆的在线实验室", page_icon="⚙️")
 def _openai_api_key():
     key = os.environ.get("OPENAI_API_KEY")
     if key:
+        key = key.strip().replace("\r", "").replace("\n", "")
+    if key:
         return key
     try:
-        return st.secrets["OPENAI_API_KEY"]
+        secret_key = st.secrets["OPENAI_API_KEY"]
+        if isinstance(secret_key, str):
+            secret_key = secret_key.strip().replace("\r", "").replace("\n", "")
+        return secret_key
     except (StreamlitSecretNotFoundError, KeyError, FileNotFoundError):
         return None
+
+
+def _error_chain(exc: Exception) -> str:
+    parts = [f"{type(exc).__name__}: {exc}"]
+    current = exc.__cause__ or exc.__context__
+    while current:
+        parts.append(f"{type(current).__name__}: {current}")
+        current = current.__cause__ or current.__context__
+    return " | ".join(parts)
+
+
+def _network_error_hint(exc: Exception) -> str:
+    chain = _error_chain(exc).lower()
+    if isinstance(exc, APITimeoutError) or "timed out" in chain or "timeout" in chain:
+        return "请求超时：网络较慢或目标服务响应超时。请检查网络，或稍后重试。"
+    if "ssl" in chain or "certificate" in chain or isinstance(exc, ssl.SSLError):
+        return "SSL/证书连接失败：请检查系统时间、代理证书或公司网络安全策略。"
+    if (
+        "proxy" in chain
+        or "407" in chain
+        or "tunnel connection failed" in chain
+        or "connection refused" in chain
+    ):
+        return "代理连接失败：请检查 HTTP(S)_PROXY 设置，或关闭无效代理后重试。"
+    if (
+        "name or service not known" in chain
+        or "nodename nor servname" in chain
+        or "getaddrinfo" in chain
+        or isinstance(exc, socket.gaierror)
+    ):
+        return "DNS 解析失败：请检查网络/DNS 设置，或切换网络后重试。"
+    if isinstance(exc, APIConnectionError) or "connection error" in chain:
+        return "网络连接失败：无法连接到 OpenAI API（可能被防火墙、VPN 或网络策略拦截）。"
+    return "API 请求失败：请查看下方错误详情并重试。"
 
 
 # 2. 初始化 OpenAI 客户端：本地用 .env / 环境变量，云端用 Streamlit Secrets
@@ -108,7 +152,29 @@ if st.button("开始检索 (Execute)"):
                 logging.info(f"[{ny_time} NY Time] AI 已成功回复。")
                 
             except Exception as e:
-                st.error("网络连接出现波动，请稍后再试。")
-                logging.error(f"API 调用出错: {e}")
+                error_details = _error_chain(e)
+                st.error(_network_error_hint(e))
+                with st.expander("错误详情（用于排查）"):
+                    st.code(error_details)
+                logging.error(f"API 调用出错: {error_details}")
     else:
         st.warning("阚教授，请输入检索内容后再点击执行。")
+
+st.markdown("---")
+st.subheader("🎨 祖孙联合工程绘图室 (实时协同)")
+
+# 创建一个独特的房间 ID
+# 建议用孙子的姓名拼音+日期，确保隐私，例如 "zhangsan-2026-bridge"
+room_id = "bridge-collaboration-room-v1"
+
+# 构造 Excalidraw 协作链接
+# 注意：加上 #room 部分后，两个进入该链接的人会看到同一个白板
+excalidraw_url = f"https://excalidraw.com/#room={room_id}"
+
+st.write("📖 **操作指南**：")
+st.caption("1. 您在这里画的内容，外婆在那边刷新页面后也能实时看到并修改。")
+st.caption("2. 点击左上角的『菜单』图标，可以保存图片到本地电脑。")
+
+# 嵌入白板界面
+# height=800 给予足够的绘图空间
+components.iframe(excalidraw_url, height=800, scrolling=True)
