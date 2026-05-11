@@ -1,4 +1,6 @@
+import base64
 import datetime
+import html
 import logging
 import os
 import random
@@ -41,7 +43,7 @@ _load_env_file()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
 st.set_page_config(
-    page_title="私人实验室视频中枢",
+    page_title="阚教授的动态空间实验室",
     layout="wide",
     initial_sidebar_state="expanded",
     page_icon="🧪",
@@ -118,8 +120,13 @@ with st.sidebar:
     st.info(f"当前房间 ID: \n`{get_room_id()}`")
     if st.button("🔄 刷新视频流"):
         st.rerun()
+    st.markdown("---")
+    st.header("📤 零件上传端")
+    st.caption("请上传您的 CAD 导出文件")
+    glb_file = st.file_uploader("上传安卓/网页版模型 (.glb)", type=["glb"])
+    usdz_file = st.file_uploader("上传苹果 AR 专用模型 (.usdz)", type=["usdz"])
 
-st.title("🧪 私人实验室：专家协作系统")
+st.title("🛰️ 阚教授的动态空间实验室")
 
 room_id = get_room_id()
 
@@ -147,29 +154,42 @@ with video_container:
 
 st.markdown("---")
 st.header("📐 阚教授的空间投影站 (Web-AR)")
-# 3D 模型（公开示例；可换成自己的 .glb；iOS AR 常用 .usdz）
-model_url = "https://modelviewer.dev/shared-assets/models/Astronaut.glb"
-ios_src = "https://modelviewer.dev/shared-assets/models/Astronaut.usdz"
-ar_html = f"""
+default_glb = "https://modelviewer.dev/shared-assets/models/Astronaut.glb"
+default_usdz = "https://modelviewer.dev/shared-assets/models/Astronaut.usdz"
+glb_src = default_glb
+ios_src = default_usdz
+if glb_file is not None:
+    glb_src = "data:model/gltf-binary;base64," + base64.b64encode(glb_file.getvalue()).decode(
+        "ascii"
+    )
+if usdz_file is not None:
+    ios_src = "data:model/vnd.usdz+zip;base64," + base64.b64encode(usdz_file.getvalue()).decode(
+        "ascii"
+    )
+glb_attr = html.escape(glb_src, quote=True)
+ios_attr = html.escape(ios_src, quote=True)
+ar_component_html = f"""
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 <model-viewer
-    src="{model_url}"
-    ios-src="{ios_src}"
+    src="{glb_attr}"
+    ios-src="{ios_attr}"
     ar
     ar-modes="webxr scene-viewer quick-look"
     camera-controls
-    shadow-intensity="1"
     auto-rotate
-    style="width: 100%; height: 500px; background-color: #f0f2f6; border-radius: 15px;">
-    <button slot="ar-button" style="background-color: white; border-radius: 4px; border: none; position: absolute; top: 16px; right: 16px; padding: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.25);">
-        👋 在您的桌面上放置零件
+    style="width: 100%; height: 600px; background-color: #ffffff; border-radius: 20px; box-shadow: inset 0 0 10px rgba(0,0,0,0.1);">
+    <button slot="ar-button" style="background-color: #FFD700; border: none; border-radius: 8px; position: absolute; top: 20px; right: 20px; padding: 12px 24px; font-weight: bold; cursor: pointer;">
+        ✨ 将此零件投影到我的桌面
     </button>
 </model-viewer>
 """
-components.html(ar_html, height=550, scrolling=False)
+components.html(ar_component_html, height=650, scrolling=False)
+if glb_file or usdz_file:
+    st.success("🚀 新零件已同步！请阚教授点击上方按钮开启投影。")
 st.caption(
     "📖 **操作指引**：阚教授可以用手指旋转模型。点击右上角按钮，即可通过 iPad 摄像头将零件投影到真实书桌上。"
 )
+st.caption("大体积模型嵌入页面可能较慢；若失败可改用小文件或托管链接。")
 
 st.markdown("---")
 st.subheader("🎨 祖孙联合工程绘图室 (实时协同)")
