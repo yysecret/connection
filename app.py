@@ -146,6 +146,32 @@ with video_container:
     components.iframe(src=video_url, height=720, scrolling=True)
 
 st.markdown("---")
+st.header("📐 阚教授的空间投影站 (Web-AR)")
+# 3D 模型（公开示例；可换成自己的 .glb；iOS AR 常用 .usdz）
+model_url = "https://modelviewer.dev/shared-assets/models/Astronaut.glb"
+ios_src = "https://modelviewer.dev/shared-assets/models/Astronaut.usdz"
+ar_html = f"""
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+<model-viewer
+    src="{model_url}"
+    ios-src="{ios_src}"
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    camera-controls
+    shadow-intensity="1"
+    auto-rotate
+    style="width: 100%; height: 500px; background-color: #f0f2f6; border-radius: 15px;">
+    <button slot="ar-button" style="background-color: white; border-radius: 4px; border: none; position: absolute; top: 16px; right: 16px; padding: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.25);">
+        👋 在您的桌面上放置零件
+    </button>
+</model-viewer>
+"""
+components.html(ar_html, height=550, scrolling=False)
+st.caption(
+    "📖 **操作指引**：阚教授可以用手指旋转模型。点击右上角按钮，即可通过 iPad 摄像头将零件投影到真实书桌上。"
+)
+
+st.markdown("---")
 st.subheader("🎨 祖孙联合工程绘图室 (实时协同)")
 st.caption(f"白板与上方视频共用同一房间号：`{room_id}`（与侧边栏显示一致）。")
 excalidraw_url = f"https://excalidraw.com/#room={room_id}"
