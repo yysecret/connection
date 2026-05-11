@@ -1,15 +1,17 @@
-import os
 import datetime
 import logging
+import os
+import random
 import socket
 import ssl
+import string
 from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
-from zoneinfo import ZoneInfo
-from openai import APITimeoutError, APIConnectionError, OpenAI
+from openai import APIConnectionError, APITimeoutError, OpenAI
 from streamlit.errors import StreamlitSecretNotFoundError
+from zoneinfo import ZoneInfo
 
 
 def _load_env_file() -> None:
@@ -30,16 +32,20 @@ def _load_env_file() -> None:
         if not key or key in os.environ:
             continue
         value = value.strip().strip("'").strip('"')
-        # Normalize accidental control characters copied with secrets.
         value = value.replace("\r", "").replace("\n", "")
         os.environ[key] = value
 
 
 _load_env_file()
 
-# 1. 基础设置与日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
-st.set_page_config(page_title="婆婆的在线实验室", page_icon="⚙️")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
+
+st.set_page_config(
+    page_title="私人实验室视频中枢",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    page_icon="🧪",
+)
 
 
 def _openai_api_key():
@@ -91,31 +97,74 @@ def _network_error_hint(exc: Exception) -> str:
     return "API 请求失败：请查看下方错误详情并重试。"
 
 
-# 2. 界面 UI 设计 (保持学术感，去除花哨的元素)
-st.title("⚙️ 婆婆的专属数字实验室")
+def get_room_id():
+    if "room_id" not in st.session_state:
+        random_str = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+        st.session_state.room_id = f"Lab_Session_{random_str}"
+    return st.session_state.room_id
+
+
+with st.sidebar:
+    st.title("🛠 实验室控制台")
+    st.markdown("---")
+    st.subheader("视频传输协议")
+    selected_mode = st.selectbox(
+        "切换显示模式：",
+        options=["普通通话模式 (Jitsi)", "高清制图模式 (VDO.ninja)"],
+        index=0,
+        help="如果需要观察微小零件的尺寸，请选择高清模式。",
+    )
+    st.markdown("---")
+    st.info(f"当前房间 ID: \n`{get_room_id()}`")
+    if st.button("🔄 刷新视频流"):
+        st.rerun()
+
+st.title("🧪 私人实验室：专家协作系统")
+
+room_id = get_room_id()
+
+if selected_mode == "普通通话模式 (Jitsi)":
+    base_url = "https://meet.jit.si/"
+    video_url = (
+        f"{base_url}{room_id}"
+        "#config.prejoinPageEnabled=false&interfaceConfig.SHOW_JITSI_WATERMARK=false"
+    )
+    st.success("✅ 当前模式：Jitsi (多功能学术讨论模式)")
+    st.caption("特点：连接快速、支持多人讨论、功能全面。")
+else:
+    base_url = "https://vdo.ninja/?"
+    video_url = (
+        f"{base_url}view={room_id}&label=Professor_Monitor"
+        "&bitrate=5000&scale=100&autostart&darkmode=1"
+    )
+    st.warning("🚀 当前模式：VDO.ninja (4K 高清制图模式)")
+    st.caption("特点：超低延迟、极高清晰度。建议在稳定 Wi-Fi 环境下使用。")
+
+video_container = st.container()
+with video_container:
+    st.caption("若嵌入区域为空白，多半是目标站点禁止 iframe；请用浏览器直接打开会议链接。")
+    components.iframe(src=video_url, height=720, scrolling=True)
+
 st.markdown("---")
 st.subheader("🎨 祖孙联合工程绘图室 (实时协同)")
-
-# 创建一个独特的房间 ID
-# 建议用孙子的姓名拼音+日期，确保隐私，例如 "zhangsan-2026-bridge"
-room_id = "bridge-collaboration-room-v1"
-
-# 构造 Excalidraw 协作链接
-# 注意：加上 #room 部分后，两个进入该链接的人会看到同一个白板
+st.caption(f"白板与上方视频共用同一房间号：`{room_id}`（与侧边栏显示一致）。")
 excalidraw_url = f"https://excalidraw.com/#room={room_id}"
-
 st.write("📖 **操作指南**：")
 st.caption("1. 您在这里画的内容，外婆在那边刷新页面后也能实时看到并修改。")
 st.caption("2. 点击左上角的『菜单』图标，可以保存图片到本地电脑。")
 st.caption("3. 为保证在 Streamlit Cloud 稳定可用，请点击下方按钮在新标签页打开白板。")
-
-# 在新标签页打开白板（比 iframe 在 Cloud 上更稳定）
 st.link_button("🚀 打开实时协同白板", excalidraw_url, use_container_width=True)
 st.markdown(f"备用链接：[{excalidraw_url}]({excalidraw_url})")
 
 st.markdown("---")
+col1, col2 = st.columns(2)
+with col1:
+    st.text_input("给教授发送即时笔记：", placeholder="例如：现在的尺寸读数是 2.54mm")
+with col2:
+    st.button("📸 截取当前高清画面并保存")
 
-# 3. 初始化 OpenAI 客户端：本地用 .env / 环境变量，云端用 Streamlit Secrets
+st.markdown("---")
+
 _api_key = _openai_api_key()
 if not _api_key:
     st.warning(
@@ -126,8 +175,6 @@ else:
     client = OpenAI(api_key=_api_key)
     st.subheader("文献与课题检索终端")
     st.write("欢迎回来，婆婆。请在下方输入您想要查阅的资料或下达科研指令。")
-
-    # 4. 设计“防沉迷与学术重定向”的灵魂 Prompt
     system_prompt = """
 你现在不是一个普通的 AI，你是阚教授（一位受人尊敬的退休机械工程专家）的私人学术助理。
 阚教授目前正在通过网络远程指导她在美国的孙子学习《机械识图》等专业知识。
@@ -139,37 +186,27 @@ else:
    拦截方式：不要直接批评或拒绝，而是巧妙地将话题转移到机械工程上。
    例如：“阚教授，关于该条目，由于来源未经国家学术标准委员会认证，系统已自动隔离。另外，您的外孙子刚刚发来留言，他在‘等轴测图’的尺寸标注上遇到了困难，您能帮他回忆一下核心原则吗？”
 """
-
-    # 5. 交互逻辑
     user_input = st.text_input("请输入检索关键词或指令：")
-
     if st.button("开始检索 (Execute)"):
         if user_input:
-            # 记录日志 (纽约时间)
             ny_time = datetime.datetime.now(ZoneInfo("America/New_York")).strftime(
                 "%Y-%m-%d %H:%M:%S %Z"
             )
             logging.info(f"[{ny_time} NY Time] 阚教授发起检索: {user_input}")
-
-            with st.spinner('系统正在从内部学术数据库中检索，请稍候...'):
+            with st.spinner("系统正在从内部学术数据库中检索，请稍候..."):
                 try:
-                    # 调用 GPT-4o 模型
                     response = client.chat.completions.create(
                         model="gpt-4o",
                         messages=[
                             {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_input}
+                            {"role": "user", "content": user_input},
                         ],
-                        temperature=0.7  # 让回答适度灵活但不过于发散
+                        temperature=0.7,
                     )
-
-                    # 展示 AI 的回答
                     assistant_reply = response.choices[0].message.content
                     st.info("💡 助理简报 (Assistant Briefing):")
                     st.write(assistant_reply)
-
                     logging.info(f"[{ny_time} NY Time] AI 已成功回复。")
-
                 except Exception as e:
                     error_details = _error_chain(e)
                     st.error(_network_error_hint(e))
